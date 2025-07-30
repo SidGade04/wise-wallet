@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PlaidLink } from "@/components/PlaidLink";
 import { useStore } from "@/store/useStore";
+import { useAuth } from "@/store/useAuth";
 import { categories } from "@/data/mockData";
 import { SpendingByCategory } from "@/types";
 import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
@@ -29,7 +30,8 @@ import {
 } from "lucide-react";
 
 export default function Dashboard() {
-  const { user, transactions } = useStore();
+  const { transactions } = useStore();
+  const { profile } = useAuth();
 
   const currentMonth = new Date();
   const monthStart = startOfMonth(currentMonth);
@@ -74,7 +76,7 @@ export default function Dashboard() {
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {user?.name}!</h1>
+          <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || 'User'}!</h1>
           <p className="text-muted-foreground">
             Here's your financial overview for {format(currentMonth, 'MMMM yyyy')}
           </p>

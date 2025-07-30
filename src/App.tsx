@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useStore } from "@/store/useStore";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
@@ -12,11 +12,6 @@ import Subscriptions from "./pages/Subscriptions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useStore();
-  return user ? <AppLayout>{children}</AppLayout> : <Navigate to="/login" replace />;
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -28,18 +23,24 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
+            <ProtectedRoute requiresBankConnection={true}>
+              <AppLayout>
+                <Dashboard />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/transactions" element={
-            <ProtectedRoute>
-              <Transactions />
+            <ProtectedRoute requiresBankConnection={true}>
+              <AppLayout>
+                <Transactions />
+              </AppLayout>
             </ProtectedRoute>
           } />
           <Route path="/subscriptions" element={
-            <ProtectedRoute>
-              <Subscriptions />
+            <ProtectedRoute requiresBankConnection={true}>
+              <AppLayout>
+                <Subscriptions />
+              </AppLayout>
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
