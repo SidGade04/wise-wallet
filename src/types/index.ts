@@ -7,6 +7,16 @@ export interface User {
   createdAt: Date;
 }
 
+export interface Profile {
+  id: string;
+  user_id: string;
+  email: string;
+  full_name: string | null;
+  has_connected_bank: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Transaction {
   id: string;
   userId: string;

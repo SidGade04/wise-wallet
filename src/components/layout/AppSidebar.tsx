@@ -22,7 +22,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useStore } from "@/store/useStore";
+import { useAuth } from "@/store/useAuth";
 
 const navigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -33,7 +33,7 @@ const navigationItems = [
 export function AppSidebar() {
   const { open } = useSidebar();
   const location = useLocation();
-  const { user, logout } = useStore();
+  const { profile, signOut } = useAuth();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -62,17 +62,16 @@ export function AppSidebar() {
         </div>
 
         {/* User Profile */}
-        {user && (
+        {profile && (
           <div className="p-4 border-b border-border/50">
             <div className="flex items-center gap-3">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={user.profilePicture} alt={user.name} />
-                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                <AvatarFallback>{(profile.full_name || profile.email).charAt(0).toUpperCase()}</AvatarFallback>
               </Avatar>
               {open && (
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{user.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  <p className="font-medium text-sm truncate">{profile.full_name || 'User'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
                 </div>
               )}
             </div>
@@ -111,7 +110,7 @@ export function AppSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
                 <button 
-                  onClick={logout}
+                  onClick={signOut}
                   className="w-full hover:bg-destructive/10 text-destructive"
                 >
                   <LogOut className="w-4 h-4" />

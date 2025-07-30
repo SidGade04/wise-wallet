@@ -31,9 +31,10 @@ const mockBanks = [
 
 interface PlaidLinkProps {
   children: React.ReactNode;
+  onSuccess?: () => void;
 }
 
-export function PlaidLink({ children }: PlaidLinkProps) {
+export function PlaidLink({ children, onSuccess }: PlaidLinkProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -71,6 +72,9 @@ export function PlaidLink({ children }: PlaidLinkProps) {
           title: "Bank account connected!",
           description: `Successfully linked your ${bank.name} account.`,
         });
+
+        // Call onSuccess callback if provided
+        onSuccess?.();
 
         // Close dialog after success
         setTimeout(() => {
