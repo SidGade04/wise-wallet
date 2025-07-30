@@ -108,7 +108,7 @@ export default function Login() {
             <PiggyBank className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-financial bg-clip-text text-transparent">
-            BudgetApp
+            Wise Wallet
           </h1>
           <p className="text-muted-foreground mt-2">
             Take control of your finances

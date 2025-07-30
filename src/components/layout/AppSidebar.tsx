@@ -38,7 +38,7 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "bg-primary text-primary-foreground font-medium" : "hover:bg-accent/50";
+    isActive ? "bg-primary font-medium" : "hover:bg-accent/50";
 
   return (
     <Sidebar
@@ -54,7 +54,7 @@ export function AppSidebar() {
             {open && (
               <div>
                 <h1 className="font-bold text-lg bg-gradient-financial bg-clip-text text-transparent">
-                  BudgetApp
+                  Wise Wallet
                 </h1>
               </div>
             )}
