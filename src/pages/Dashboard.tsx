@@ -3,8 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PlaidLink } from "@/components/PlaidLink";
+import { BankConnectionStatus } from "@/components/BankConnectionStatus";
 import { useStore } from "@/store/useStore";
 import { useAuth } from "@/store/useAuth";
+import { useBankAccounts } from "@/hooks/usePlaid";
 import { categories } from "@/data/mockData";
 import { SpendingByCategory } from "@/types";
 import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
@@ -32,6 +34,7 @@ import {
 export default function Dashboard() {
   const { transactions } = useStore();
   const { profile } = useAuth();
+  const { data: bankAccounts } = useBankAccounts();
 
   const currentMonth = new Date();
   const monthStart = startOfMonth(currentMonth);
@@ -81,12 +84,14 @@ export default function Dashboard() {
             Here's your financial overview for {format(currentMonth, 'MMMM yyyy')}
           </p>
         </div>
-        <PlaidLink>
-          <Button variant="financial">
-            <PlusCircle className="w-4 h-4 mr-2" />
-            Link Bank Account
-          </Button>
-        </PlaidLink>
+        {(!bankAccounts || bankAccounts.length === 0) && (
+          <PlaidLink>
+            <Button variant="financial">
+              <PlusCircle className="w-4 h-4 mr-2" />
+              Link Bank Account
+            </Button>
+          </PlaidLink>
+        )}
       </div>
 
       {/* Overview Cards */}
@@ -147,6 +152,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bank Connection Status */}
+      <BankConnectionStatus />
 
       {/* Charts Section */}
       <div className="grid gap-6 md:grid-cols-2">

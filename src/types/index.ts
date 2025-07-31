@@ -50,11 +50,13 @@ export interface Category {
 
 export interface BankAccount {
   id: string;
-  userId: string;
-  name: string;
-  balance: number;
-  type: 'checking' | 'savings' | 'credit';
-  lastSynced: Date;
+  user_id: string;
+  institution_name: string;
+  account_name: string;
+  account_type: string;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SpendingByCategory {
