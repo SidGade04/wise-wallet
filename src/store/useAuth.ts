@@ -17,6 +17,7 @@ interface AuthState {
   signOut: () => Promise<void>;
   fetchProfile: () => Promise<void>;
   updateBankConnection: (hasConnected: boolean) => Promise<void>;
+  signInWithOAuth: (provider: 'google' | 'github') => Promise<{ error: string | null }>;
 }
 
 export const useAuth = create<AuthState>((set, get) => ({
@@ -111,6 +112,28 @@ export const useAuth = create<AuthState>((set, get) => ({
       return { error: 'An unexpected error occurred' };
     }
   },
+
+  signInWithOAuth: async (provider) => {
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    if (error) {
+      console.error("OAuth login failed:", error);
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch (error) {
+    console.error("Unexpected OAuth error:", error);
+    return { error: 'An unexpected error occurred' };
+  }
+},
+
 
   signOut: async () => {
     try {
