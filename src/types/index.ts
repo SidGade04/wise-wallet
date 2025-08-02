@@ -64,3 +64,12 @@ export interface SpendingByCategory {
   amount: number;
   color: string;
 }
+
+export interface AIInsight {
+  id: string;
+  user_id: string;
+  type: 'question' | 'summary';
+  question: string | null;
+  response: string;
+  created_at: string;
+}

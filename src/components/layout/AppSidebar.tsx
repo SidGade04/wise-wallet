@@ -6,7 +6,8 @@ import {
   CreditCard,
   Settings,
   LogOut,
-  PiggyBank
+  PiggyBank,
+  Bot
 } from "lucide-react";
 
 import {
@@ -28,6 +29,7 @@ const navigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transactions", url: "/transactions", icon: Receipt },
   { title: "Subscriptions", url: "/subscriptions", icon: CreditCard },
+  { title: "AI Assistant", url: "/assistant", icon: Bot },
 ];
 
 export function AppSidebar() {
