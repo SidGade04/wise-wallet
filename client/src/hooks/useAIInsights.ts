@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/useAuth';
 import { AIInsight } from '@/types';
 
+const API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8000';
+
 export const useAIInsights = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -27,43 +29,22 @@ export const useAIInsights = () => {
     enabled: !!user,
   });
 
-  // Mock API calls for FastAPI backend
+  // Ask a question
   const askQuestionMutation = useMutation({
     mutationFn: async (question: string) => {
       setIsSubmitting(true);
-      try {
-        // TODO: Replace with actual FastAPI endpoint
-        const response = await fetch('/api/ai/ask', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ question }),
-        });
+      const response = await fetch(`${API_URL}/api/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user?.id, question }),
+      });
 
-        if (!response.ok) {
-          // Mock response for development
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return {
-            response: `Based on your spending patterns, here's what I found about "${question}": This is a mock response. Your actual insights will come from the FastAPI backend once it's connected.`
-          };
-        }
-
-        return response.json();
-      } catch (error) {
-        // Mock response for development
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return {
-          response: `Based on your spending patterns, here's what I found about "${question}": This is a mock response. Your actual insights will come from the FastAPI backend once it's connected.`
-        };
-      } finally {
-        setIsSubmitting(false);
-      }
+      if (!response.ok) throw new Error('Failed to get response from AI');
+      return response.json();
     },
     onSuccess: async (data, question) => {
       if (!user) return;
 
-      // Save to Supabase
       await supabase.from('ai_insights').insert({
         user_id: user.id,
         type: 'question',
@@ -73,43 +54,23 @@ export const useAIInsights = () => {
 
       queryClient.invalidateQueries({ queryKey: ['ai-insights', user.id] });
     },
+    onSettled: () => {
+      setIsSubmitting(false);
+    },
   });
 
+  // Analyze spending
   const analyzeSpendingMutation = useMutation({
     mutationFn: async () => {
       setIsSubmitting(true);
-      try {
-        // TODO: Replace with actual FastAPI endpoint
-        const response = await fetch('/api/ai/insights', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+      const response = await fetch(`${API_URL}/api/analyze?user_id=${user?.id}`);
 
-        if (!response.ok) {
-          // Mock response for development
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          return {
-            response: "Here's your spending analysis: You've spent 15% more on dining out this month compared to last month. Consider setting a weekly dining budget to help control these expenses. Your grocery spending is well within budget - great job!"
-          };
-        }
-
-        return response.json();
-      } catch (error) {
-        // Mock response for development
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        return {
-          response: "Here's your spending analysis: You've spent 15% more on dining out this month compared to last month. Consider setting a weekly dining budget to help control these expenses. Your grocery spending is well within budget - great job!"
-        };
-      } finally {
-        setIsSubmitting(false);
-      }
+      if (!response.ok) throw new Error('Failed to analyze spending');
+      return response.json();
     },
     onSuccess: async (data) => {
       if (!user) return;
 
-      // Save to Supabase
       await supabase.from('ai_insights').insert({
         user_id: user.id,
         type: 'summary',
@@ -118,6 +79,9 @@ export const useAIInsights = () => {
       });
 
       queryClient.invalidateQueries({ queryKey: ['ai-insights', user.id] });
+    },
+    onSettled: () => {
+      setIsSubmitting(false);
     },
   });
 
