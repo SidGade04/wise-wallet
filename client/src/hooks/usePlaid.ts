@@ -1,127 +1,244 @@
+// hooks/usePlaid.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { BankAccount } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
-// Mock API endpoints - replace with your actual FastAPI endpoints
-const API_BASE = '/api'; // Update this to your FastAPI URL
-
+// Types
 interface LinkTokenResponse {
   link_token: string;
+  expiration: string;
 }
 
 interface ExchangeTokenRequest {
   public_token: string;
-  metadata: any;
+  metadata?: any;
 }
 
 interface ExchangeTokenResponse {
-  success: boolean;
-  account_data: {
-    institution_name: string;
-    account_name: string;
-    account_type: string;
-  };
+  access_token: string;
+  item_id: string;
+  message: string;
 }
 
-export const usePlaidLinkToken = () => {
-  return useQuery({
-    queryKey: ['plaid-link-token'],
-    queryFn: async (): Promise<LinkTokenResponse> => {
-      // For demo purposes, return a mock token
-      // Replace this with actual API call to your FastAPI backend
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({ link_token: 'mock-link-token-for-demo' });
-        }, 1000);
-      });
-      
-      // Actual implementation would be:
-      // const response = await fetch(`${API_BASE}/plaid/link-token`);
-      // if (!response.ok) throw new Error('Failed to fetch link token');
-      // return response.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3,
-  });
+interface Account {
+  account_id: string;
+  name: string;
+  type: string;
+  subtype: string | null;
+  balance: number;
+}
+
+interface Transaction {
+  transaction_id: string;  
+  account_id: string;
+  amount: number;
+  date: string;
+  name: string;
+  category: string[];
+}
+
+// Configuration - Handle environment variables safely
+const getEnvVar = (name: string, defaultValue: string) => {
+  if (typeof window !== 'undefined') {
+    // Browser environment - check if vite or create-react-app
+    return (window as any).__ENV__?.[name] || 
+           (import.meta?.env?.[name]) || 
+           defaultValue;
+  }
+  return defaultValue;
 };
 
-export const usePlaidExchange = () => {
+const API_BASE_URL = getEnvVar('REACT_APP_API_URL', 'http://127.0.0.1:8000/api/plaid');
+
+// API functions
+const plaidApi = {
+  createLinkToken: async (userId: string): Promise<LinkTokenResponse> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/create_link_token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          client_name: 'Wise Wallet App'
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Network error' }));
+        throw new Error(error.detail || `HTTP ${response.status}: Failed to create link token`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('createLinkToken error:', error);
+      throw error instanceof Error ? error : new Error('Failed to create link token');
+    }
+  },
+
+  exchangePublicToken: async (data: ExchangeTokenRequest): Promise<ExchangeTokenResponse> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/exchange_public_token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          public_token: data.public_token
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Network error' }));
+        throw new Error(error.detail || `HTTP ${response.status}: Failed to exchange public token`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('exchangePublicToken error:', error);
+      throw error instanceof Error ? error : new Error('Failed to exchange public token');
+    }
+  },
+
+  getAccounts: async (itemId: string): Promise<{
+    length: number; accounts: Account[] 
+}> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/accounts/${itemId}`);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Network error' }));
+        throw new Error(error.detail || `HTTP ${response.status}: Failed to fetch accounts`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('getAccounts error:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch accounts');
+    }
+  },
+
+  getTransactions: async (itemId: string, days: number = 30): Promise<{ transactions: Transaction[], total_transactions: number }> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/transactions/${itemId}?days=${days}`);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Network error' }));
+        throw new Error(error.detail || `HTTP ${response.status}: Failed to fetch transactions`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('getTransactions error:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch transactions');
+    }
+  },
+
+  getAllItems: async (): Promise<{ items: string[] }> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/items`);
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Network error' }));
+        throw new Error(error.detail || `HTTP ${response.status}: Failed to fetch items`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('getAllItems error:', error);
+      throw error instanceof Error ? error : new Error('Failed to fetch items');
+    }
+  }
+};
+
+// Custom hooks
+export function usePlaidLinkToken(userId?: string) {
+  return useQuery({
+    queryKey: ['plaid-link-token', userId],
+    queryFn: () => plaidApi.createLinkToken(userId || `user_${Date.now()}`),
+    enabled: true,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: 2,
+  });
+}
+
+export function usePlaidExchange() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (data: ExchangeTokenRequest): Promise<ExchangeTokenResponse> => {
-      // For demo purposes, return mock success
-      // Replace this with actual API call to your FastAPI backend
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            success: true,
-            account_data: {
-              institution_name: 'Demo Bank',
-              account_name: 'Demo Checking',
-              account_type: 'checking',
-            },
-          });
-        }, 2000);
-      });
-
-      // Actual implementation would be:
-      // const response = await fetch(`${API_BASE}/plaid/exchange`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(data),
-      // });
-      // if (!response.ok) throw new Error('Failed to exchange token');
-      // return response.json();
-    },
-    onSuccess: async (response) => {
-      // Store bank account in Supabase
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { error } = await supabase
-        .from('bank_accounts')
-        .insert({
-          user_id: user.id,
-          institution_name: response.account_data.institution_name,
-          account_name: response.account_data.account_name,
-          account_type: response.account_data.account_type,
-          last_synced_at: new Date().toISOString(),
-        });
-
-      if (error) throw error;
-
-      // Invalidate and refetch bank accounts
-      queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
+    mutationFn: plaidApi.exchangePublicToken,
+    onSuccess: (data) => {
+      // Store the item_id in localStorage for later use
+      localStorage.setItem('plaid_item_id', data.item_id);
+      localStorage.setItem('plaid_access_token', data.access_token);
       
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['plaid-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['plaid-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['plaid-items'] });
+
       toast({
-        title: "Bank account connected!",
-        description: `Successfully linked your ${response.account_data.institution_name} account.`,
+        title: "Bank Connected Successfully!",
+        description: "Your bank account has been linked to Wise Wallet.",
+        variant: "default",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
-        title: "Connection failed",
+        title: "Connection Failed",
         description: error.message,
         variant: "destructive",
       });
     },
   });
-};
+}
 
-export const useBankAccounts = () => {
+export function usePlaidAccounts(itemId?: string) {
+  const storedItemId = localStorage.getItem('plaid_item_id');
+  const finalItemId = itemId || storedItemId;
+
   return useQuery({
-    queryKey: ['bank-accounts'],
-    queryFn: async (): Promise<BankAccount[]> => {
-      const { data, error } = await supabase
-        .from('bank_accounts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
+    queryKey: ['plaid-accounts', finalItemId],
+    queryFn: () => plaidApi.getAccounts(finalItemId!),
+    enabled: !!finalItemId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
-};
+}
+
+// Alias for backward compatibility
+export const useBankAccounts = usePlaidAccounts;
+
+export function usePlaidTransactions(itemId?: string, days: number = 30) {
+  const storedItemId = localStorage.getItem('plaid_item_id');
+  const finalItemId = itemId || storedItemId;
+
+  return useQuery({
+    queryKey: ['plaid-transactions', finalItemId, days],
+    queryFn: () => plaidApi.getTransactions(finalItemId!, days),
+    enabled: !!finalItemId,  
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
+// Alias for backward compatibility  
+export const useBankTransactions = usePlaidTransactions;
+
+export function usePlaidItems() {
+  return useQuery({
+    queryKey: ['plaid-items'],
+    queryFn: plaidApi.getAllItems,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+// Helper hook to check if user has connected bank
+export function useHasConnectedBank() {
+  const { data: items } = usePlaidItems();
+  const storedItemId = localStorage.getItem('plaid_item_id');
+  
+  return {
+    hasConnectedBank: !!(items?.items?.length || storedItemId),
+    itemId: storedItemId,
+  };
+}

@@ -1,0 +1,68 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+server/venv/
+
+# Build output
+dist/
+dist-ssr/
+build/
+__pycache__/
+
+# Environment files
+*.env
+*.env.local
+.env.*
+
+# Editor configs
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+# System files
+Thumbs.db
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Python cache
+*.pyc
+*.pyo
+*.pyd
+
+# OS-specific
+ehthumbs.db
+Icon?
+Desktop.ini
+
+# Bun
+bun.lockb
+
+# TypeScript
+*.tsbuildinfo
+
+# Test output
+coverage/
+coverage-final.json
+.nyc_output/
+
+# Local secrets or database
+supabase/.temp/
+supabase/migrations/
+supabase/seeders/
+
+# Mac system files
+.AppleDouble
+.LSOverride
