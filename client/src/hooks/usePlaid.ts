@@ -100,21 +100,34 @@ const plaidApi = {
     }
   },
 
-  getAccounts: async (itemId: string): Promise<{
-    length: number; accounts: Account[] 
-}> => {
+  // Fetch bank accounts for a given Plaid item. The server returns
+  // an object with an ``accounts`` array, but callers expect just the
+  // array of ``Account`` objects. Previously this function forwarded the
+  // entire response which resulted in consumers treating the returned
+  // object like an array (calling ``map``/``length`` directly) and
+  // causing runtime errors. Instead, return only the accounts array
+  // while defaulting to an empty list when the response structure is
+  // unexpected.
+  getAccounts: async (itemId: string): Promise<Account[]> => {
     try {
       const response = await fetch(`${API_BASE_URL}/accounts/${itemId}`);
-      
+
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Network error' }));
-        throw new Error(error.detail || `HTTP ${response.status}: Failed to fetch accounts`);
+        const error = await response
+          .json()
+          .catch(() => ({ detail: 'Network error' }));
+        throw new Error(
+          error.detail || `HTTP ${response.status}: Failed to fetch accounts`,
+        );
       }
 
-      return await response.json();
+      const data = await response.json();
+      return data.accounts ?? [];
     } catch (error) {
       console.error('getAccounts error:', error);
-      throw error instanceof Error ? error : new Error('Failed to fetch accounts');
+      throw error instanceof Error
+        ? error
+        : new Error('Failed to fetch accounts');
     }
   },
 
