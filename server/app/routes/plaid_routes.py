@@ -2,8 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 import logging
 from typing import Dict, Any
 
-from plaid.model.investments_holdings_get_request import InvestmentsHoldingsGetRequest
-from plaid.model.investments_transactions_get_request import InvestmentsTransactionsGetRequest
 from ..services.plaid_service import PlaidService
 from ..core.auth import get_current_user, verify_user_access
 from ..models.plaid_models import LinkTokenRequest, PublicTokenExchangeRequest
@@ -126,42 +124,14 @@ async def debug_auth(current_user: Dict[str, Any] = Depends(get_current_user)):
     }
 
 @router.get("/investments/{item_id}/holdings")
-async def get_investment_holdings(item_id: str):
+async def get_investment_holdings(
+    item_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
     """Get investment holdings for a specific item"""
     try:
-        if item_id not in user_items:
-            raise HTTPException(status_code=404, detail="Item not found")
-
-        access_token = user_items[item_id]["access_token"]
-
-        holdings_request = InvestmentsHoldingsGetRequest(access_token=access_token)
-        response = client.investments_holdings_get(holdings_request)
-
-        securities = {s.security_id: s for s in response.securities}
-
-        holdings = []
-        total_value = 0.0
-        for h in response.holdings:
-            security = securities.get(h.security_id)
-            price = float(h.institution_price) if h.institution_price else None
-            value = float(h.institution_value) if h.institution_value else (
-                (price or 0) * float(h.quantity)
-            )
-            holdings.append(
-                HoldingInfo(
-                    security_id=h.security_id,
-                    account_id=h.account_id,
-                    ticker=getattr(security, "ticker", None),
-                    name=getattr(security, "name", None),
-                    quantity=float(h.quantity),
-                    price=price,
-                    value=value,
-                )
-            )
-            total_value += value or 0.0
-
-        return {"holdings": holdings, "total_value": total_value}
-
+        user_id = current_user["user_id"]
+        return await plaid_service.get_investment_holdings(user_id, item_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -170,48 +140,15 @@ async def get_investment_holdings(item_id: str):
 
 
 @router.get("/investments/{item_id}/transactions")
-async def get_investment_transactions(item_id: str, days: int = 30):
+async def get_investment_transactions(
+    item_id: str,
+    days: int = 30,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
     """Get investment transactions for a specific item"""
     try:
-        if item_id not in user_items:
-            raise HTTPException(status_code=404, detail="Item not found")
-
-        access_token = user_items[item_id]["access_token"]
-
-        start_date = (datetime.now() - timedelta(days=days)).date()
-        end_date = datetime.now().date()
-
-        transactions_request = InvestmentsTransactionsGetRequest(
-            access_token=access_token,
-            start_date=start_date,
-            end_date=end_date,
-        )
-
-        response = client.investments_transactions_get(transactions_request)
-
-        securities = {s.security_id: s for s in response.securities}
-
-        transactions = []
-        for t in response.investment_transactions:
-            security = securities.get(t.security_id) if t.security_id else None
-            transactions.append(
-                InvestmentTransactionInfo(
-                    investment_transaction_id=t.investment_transaction_id,
-                    account_id=t.account_id,
-                    security_id=t.security_id,
-                    ticker=getattr(security, "ticker", None),
-                    name=getattr(security, "name", None),
-                    type=t.type,
-                    date=t.date.isoformat(),
-                    quantity=float(t.quantity) if t.quantity else None,
-                    price=float(t.price) if t.price else None,
-                    amount=float(t.amount),
-                    fees=float(t.fees) if t.fees else None,
-                )
-            )
-
-        return {"transactions": transactions}
-
+        user_id = current_user["user_id"]
+        return await plaid_service.get_investment_transactions(user_id, item_id, days)
     except HTTPException:
         raise
     except Exception as e:

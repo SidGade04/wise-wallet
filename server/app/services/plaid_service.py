@@ -9,6 +9,8 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.country_code import CountryCode
 from plaid.model.products import Products
+from plaid.model.investments_holdings_get_request import InvestmentsHoldingsGetRequest
+from plaid.model.investments_transactions_get_request import InvestmentsTransactionsGetRequest
 from plaid.configuration import Configuration
 from plaid.api_client import ApiClient
 from plaid.exceptions import ApiException
@@ -347,5 +349,118 @@ class PlaidService:
             
         except Exception as e:
             logger.error(f"Error removing item {item_id}: {str(e)}")
+            raise
+
+    async def get_investment_holdings(self, user_id: str, item_id: str) -> Dict[str, Any]:
+        """Fetch investment holdings for a specific item and store them."""
+        try:
+            result = self.supabase.table("bank_items").select("access_token").eq("item_id", item_id).eq("user_id", user_id).execute()
+            if not result.data:
+                raise Exception("Item not found or access denied")
+
+            access_token = result.data[0]["access_token"]
+            request = InvestmentsHoldingsGetRequest(access_token=access_token)
+            response = self.plaid_client.investments_holdings_get(request)
+
+            securities = {s.security_id: s for s in response.securities}
+            holdings = []
+            total_value = 0.0
+
+            for h in response.holdings:
+                sec = securities.get(h.security_id)
+                price = float(h.institution_price) if h.institution_price else None
+                value = float(h.institution_value) if h.institution_value else (
+                    (price or 0) * float(h.quantity)
+                )
+                holding_data = {
+                    "user_id": user_id,
+                    "account_id": h.account_id,
+                    "security_id": h.security_id,
+                    "ticker": getattr(sec, "ticker", None),
+                    "quantity": float(h.quantity),
+                    "price": price,
+                    "value": value,
+                    "cost_basis": float(h.cost_basis) if h.cost_basis else None,
+                }
+                self.supabase.table("investment_holdings").upsert(
+                    holding_data,
+                    on_conflict="security_id,account_id"
+                ).execute()
+
+                holdings.append({
+                    "security_id": h.security_id,
+                    "account_id": h.account_id,
+                    "ticker": getattr(sec, "ticker", None),
+                    "name": getattr(sec, "name", None),
+                    "quantity": float(h.quantity),
+                    "price": price,
+                    "value": value,
+                })
+                total_value += value or 0
+
+            return {"holdings": holdings, "total_value": total_value}
+
+        except Exception as e:
+            logger.error(f"Error fetching investment holdings: {str(e)}")
+            raise
+
+    async def get_investment_transactions(self, user_id: str, item_id: str, days: int = 30) -> Dict[str, Any]:
+        """Fetch investment transactions for a specific item and store them."""
+        try:
+            result = self.supabase.table("bank_items").select("access_token").eq("item_id", item_id).eq("user_id", user_id).execute()
+            if not result.data:
+                raise Exception("Item not found or access denied")
+
+            access_token = result.data[0]["access_token"]
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=days)
+
+            request = InvestmentsTransactionsGetRequest(
+                access_token=access_token,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            response = self.plaid_client.investments_transactions_get(request)
+
+            securities = {s.security_id: s for s in response.securities}
+            transactions = []
+            for t in response.investment_transactions:
+                sec = securities.get(t.security_id) if t.security_id else None
+                txn_data = {
+                    "user_id": user_id,
+                    "account_id": t.account_id,
+                    "security_id": t.security_id,
+                    "investment_transaction_id": t.investment_transaction_id,
+                    "ticker": getattr(sec, "ticker", None),
+                    "date": t.date.isoformat(),
+                    "type": t.type,
+                    "quantity": float(t.quantity) if t.quantity else None,
+                    "price": float(t.price) if t.price else None,
+                    "amount": float(t.amount),
+                    "fees": float(t.fees) if t.fees else None,
+                }
+                self.supabase.table("investment_transactions").upsert(
+                    txn_data,
+                    on_conflict="investment_transaction_id"
+                ).execute()
+
+                transactions.append({
+                    "investment_transaction_id": t.investment_transaction_id,
+                    "account_id": t.account_id,
+                    "security_id": t.security_id,
+                    "ticker": getattr(sec, "ticker", None),
+                    "name": getattr(sec, "name", None),
+                    "type": t.type,
+                    "date": t.date.isoformat(),
+                    "quantity": float(t.quantity) if t.quantity else None,
+                    "price": float(t.price) if t.price else None,
+                    "amount": float(t.amount),
+                    "fees": float(t.fees) if t.fees else None,
+                })
+
+            return {"transactions": transactions}
+
+        except Exception as e:
+            logger.error(f"Error fetching investment transactions: {str(e)}")
             raise
 

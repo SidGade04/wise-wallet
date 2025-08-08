@@ -16,13 +16,14 @@ const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#AF19FF"];
 
 export default function Investments() {
   const itemId = typeof window !== "undefined" ? localStorage.getItem("plaid_item_id") : null;
-  const { holdings, totalValue, fetchHoldings } = useInvestmentsStore();
+  const { holdings, transactions, totalValue, fetchHoldings, fetchTransactions } = useInvestmentsStore();
 
   useEffect(() => {
     if (itemId) {
       fetchHoldings(itemId);
+      fetchTransactions(itemId);
     }
-  }, [itemId, fetchHoldings]);
+  }, [itemId, fetchHoldings, fetchTransactions]);
 
   const allocationData = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -81,6 +82,40 @@ export default function Investments() {
                     <TableCell className="text-right">{h.quantity}</TableCell>
                     <TableCell className="text-right">{h.price?.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{h.value?.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-semibold mb-2">Transactions</h2>
+        <Card>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Symbol</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Fees</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map((t) => (
+                  <TableRow key={t.investment_transaction_id}>
+                    <TableCell>{new Date(t.date).toLocaleDateString()}</TableCell>
+                    <TableCell>{t.ticker}</TableCell>
+                    <TableCell>{t.type}</TableCell>
+                    <TableCell className="text-right">{t.quantity}</TableCell>
+                    <TableCell className="text-right">{t.price?.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{t.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{t.fees?.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
