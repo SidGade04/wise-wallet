@@ -20,7 +20,7 @@ const getEnvVar = (name: string, defaultValue: string) => {
   return defaultValue;
 };
 
-const API_BASE_URL = getEnvVar('REACT_APP_API_URL', 'http://127.0.0.1:8000/api/plaid');
+const API_BASE_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8080';
 
 export const useInvestmentsStore = create<InvestmentsState>((set) => ({
   holdings: [],
