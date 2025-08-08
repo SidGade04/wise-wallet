@@ -27,13 +27,23 @@ export const useInvestmentsStore = create<InvestmentsState>((set) => ({
   transactions: [],
   totalValue: 0,
   fetchHoldings: async (itemId: string) => {
-    const res = await fetch(`${API_BASE_URL}/investments/${itemId}/holdings`);
+    const token = localStorage.getItem('auth_token');
+    const res = await fetch(`${API_BASE_URL}/investments/${itemId}/holdings`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     if (!res.ok) throw new Error('Failed to fetch holdings');
     const data = await res.json();
     set({ holdings: data.holdings, totalValue: data.total_value });
   },
   fetchTransactions: async (itemId: string) => {
-    const res = await fetch(`${API_BASE_URL}/investments/${itemId}/transactions`);
+    const token = localStorage.getItem('auth_token');
+    const res = await fetch(`${API_BASE_URL}/investments/${itemId}/transactions`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     if (!res.ok) throw new Error('Failed to fetch transactions');
     const data = await res.json();
     set({ transactions: data.transactions });
