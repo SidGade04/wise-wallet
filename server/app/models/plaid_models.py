@@ -1,3 +1,8 @@
+# app/services/plaid_service.py
+"""
+Business logic for Plaid operations.
+"""
+
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
@@ -349,3 +354,143 @@ class PlaidService:
             logger.error(f"Error removing item {item_id}: {str(e)}")
             raise
 
+
+# app/core/auth.py
+"""
+Authentication utilities.
+"""
+
+import jwt
+import logging
+from typing import Dict, Any
+from fastapi import HTTPException, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import os
+
+logger = logging.getLogger(__name__)
+security = HTTPBearer()
+
+
+def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+    """Verify JWT token and extract user information."""
+    try:
+        token = credentials.credentials
+        
+        # Decode JWT token
+        payload = jwt.decode(
+            token, 
+            os.getenv("SUPABASE_JWT_SECRET"), 
+            algorithms=["HS256"],
+            audience="authenticated"
+        )
+        
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token: missing user ID"
+            )
+            
+        return {
+            "user_id": user_id,
+            "email": payload.get("email"),
+            "role": payload.get("role", "authenticated")
+        }
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired"
+        )
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Token verification error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+
+
+async def get_current_user(user_info: Dict[str, Any] = Depends(verify_jwt_token)) -> Dict[str, Any]:
+    """Get current authenticated user."""
+    return user_info
+
+
+def verify_user_access(current_user_id: str, requested_user_id: str):
+    """Verify that user can only access their own data."""
+    if current_user_id != requested_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Can only access your own data"
+        )
+
+
+# app/models/plaid_models.py
+"""
+Pydantic models for Plaid API.
+"""
+
+from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+from enum import Enum
+
+
+class LinkTokenRequest(BaseModel):
+    user_id: str
+    client_name: str = "Plaid Integration App"
+
+
+class PublicTokenExchangeRequest(BaseModel):
+    public_token: str
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ItemInfo(BaseModel):
+    access_token: str
+    item_id: str
+    institution_id: Optional[str] = None
+    institution_name: Optional[str] = None
+
+
+class AccountInfo(BaseModel):
+    account_id: str
+    name: str
+    type: str
+    subtype: Optional[str] = None
+    balance: float
+    item_id: Optional[str] = None
+    institution_name: Optional[str] = None
+    last_synced_at: Optional[str] = None
+    status: Optional[str] = None
+
+
+class TransactionInfo(BaseModel):
+    transaction_id: str
+    account_id: str
+    amount: float
+    date: str
+    name: str
+    category: List[str] = []
+    merchant_name: Optional[str] = None
+    pending: bool = False
+    payment_channel: Optional[str] = None
+    iso_currency_code: Optional[str] = None
+
+
+class AccountType(str, Enum):
+    depository = "depository"
+    credit = "credit"
+    loan = "loan"
+    investment = "investment"
+    brokerage = "brokerage"
+    other = "other"
+
+
+class AccountSubtype(str, Enum):
+    checking = "checking"
+    savings = "savings"
+    credit_card = "credit card"

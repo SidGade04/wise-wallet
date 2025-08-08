@@ -27,7 +27,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/useToast";
 
 export default function Login() {
   const { user, isLoading, initialize, signIn, signUp, signInWithOAuth } = useAuth();

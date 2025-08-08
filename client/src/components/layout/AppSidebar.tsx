@@ -7,7 +7,8 @@ import {
   Settings,
   LogOut,
   PiggyBank,
-  Bot
+  Bot,
+  LineChart
 } from "lucide-react";
 
 import {
@@ -29,6 +30,7 @@ const navigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transactions", url: "/transactions", icon: Receipt },
   { title: "Subscriptions", url: "/subscriptions", icon: CreditCard },
+  { title: "Investments", url: "/investments", icon: LineChart },
   { title: "AI Assistant", url: "/assistant", icon: Bot },
 ];
 

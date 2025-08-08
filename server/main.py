@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.routes.ai_routes import router as ai_router
 from app.routes.plaid_routes import router as plaid_router
 from fastapi.middleware.cors import CORSMiddleware
+from app.routes.stripe_routes import router as stripe_router
 
 app = FastAPI(title="Plaid Integration API", version="1.0.0")
 
@@ -16,6 +17,7 @@ app.add_middleware(
 # Include routers
 app.include_router(ai_router, prefix="/api")
 app.include_router(plaid_router, prefix="/api/plaid")
+app.include_router(stripe_router, prefix="/api/stripe")
 
 # Root endpoint
 @app.get("/")

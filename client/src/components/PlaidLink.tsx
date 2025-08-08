@@ -3,6 +3,7 @@ import { usePlaidLink } from 'react-plaid-link';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlaidLinkToken, usePlaidExchange } from "@/hooks/usePlaid";
+import { PlaidConnectionSuccess } from "./PlaidConnectionSuccess";
 import { 
   CheckCircle, 
   Loader2,
@@ -10,7 +11,7 @@ import {
   Lock,
   AlertCircle
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/store/useAuth";
 
 interface PlaidLinkProps {
@@ -55,10 +56,10 @@ export function PlaidLink({ children, onSuccess }: PlaidLinkProps) {
             console.log('Exchange success:', data);
             onSuccess?.();
             
-            // Show success message for a bit longer
+            // Keep success state visible longer to show insights
             setTimeout(() => {
               setIsConnected(false);
-            }, 3000);
+            }, 30000); // 30 seconds to view insights
           },
           onError: (error) => {
             console.error('Exchange error:', error);
@@ -140,6 +141,7 @@ export function PlaidLink({ children, onSuccess }: PlaidLinkProps) {
     onExit: onPlaidExit,
     onEvent: onPlaidEvent,
     env: 'sandbox', // Changed to production to match your backend
+    // env: 'production',
   });
 
   const handleClick = () => {
@@ -201,20 +203,10 @@ export function PlaidLink({ children, onSuccess }: PlaidLinkProps) {
 
   if (isConnected && exchangeMutation.isSuccess) {
     return (
-      <div className="text-center space-y-4 py-4">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-          <CheckCircle className="w-8 h-8 text-green-600" />
-        </div>
-        <div>
-          <h3 className="font-medium text-lg">Account Connected!</h3>
-          <p className="text-sm text-muted-foreground">
-            Your bank account has been successfully linked
-          </p>
-        </div>
-        <Badge variant="secondary" className="bg-green-100 text-green-800">
-          Ready to sync transactions
-        </Badge>
-      </div>
+      <PlaidConnectionSuccess 
+        itemId={exchangeMutation.data?.item_id}
+        onContinue={() => setIsConnected(false)}
+      />
     );
   }
 
