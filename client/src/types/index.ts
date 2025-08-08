@@ -73,3 +73,27 @@ export interface AIInsight {
   response: string;
   created_at: string;
 }
+
+export interface InvestmentHolding {
+  security_id: string;
+  account_id: string;
+  ticker?: string | null;
+  name?: string | null;
+  quantity: number;
+  price?: number | null;
+  value?: number | null;
+}
+
+export interface InvestmentTransaction {
+  investment_transaction_id: string;
+  account_id: string;
+  security_id?: string | null;
+  ticker?: string | null;
+  name?: string | null;
+  type: string;
+  date: string;
+  quantity?: number | null;
+  price?: number | null;
+  amount: number;
+  fees?: number | null;
+}

@@ -1,19 +1,23 @@
 import { useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/store/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlaidLink } from '@/components/PlaidLink';
 import { Loader2, CreditCard, Lock } from 'lucide-react';
+import { useSubscription } from '@/store/useSubscription';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiresBankConnection?: boolean;
+  requiresSubscription?: boolean;
 }
 
-export function ProtectedRoute({ children, requiresBankConnection = false }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requiresBankConnection = false, requiresSubscription = false }: ProtectedRouteProps) {
   const { user, profile, isLoading, isInitialized, initialize, updateBankConnection } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isPro } = useSubscription();
 
   useEffect(() => {
     if (!isInitialized) {
@@ -88,6 +92,29 @@ export function ProtectedRoute({ children, requiresBankConnection = false }: Pro
           <Lock className="h-4 w-4" />
           <span>Setting up your account...</span>
         </div>
+      </div>
+    );
+  }
+  
+  if (requiresSubscription && !isPro) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-8 h-8 text-primary" />
+            </div>
+            <CardTitle className="text-xl">Premium Feature</CardTitle>
+            <CardDescription>
+              Upgrade your account to access this feature.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="w-full" size="lg" onClick={() => navigate('/upgrade')}>
+              Upgrade
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

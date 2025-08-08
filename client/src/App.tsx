@@ -10,6 +10,8 @@ import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Subscriptions from "./pages/Subscriptions";
 import AIAssistant from "./pages/AIAssistant";
+import Upgrade from "./pages/Upgrade";
+import Investments from "./pages/Investments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,16 +40,30 @@ const App = () => (
             </ProtectedRoute>
           } />
           <Route path="/subscriptions" element={
-            <ProtectedRoute requiresBankConnection={true}>
+            <ProtectedRoute requiresBankConnection={true} requiresSubscription={true}>
               <AppLayout>
                 <Subscriptions />
               </AppLayout>
             </ProtectedRoute>
           } />
+          <Route path="/investments" element={
+            <ProtectedRoute requiresBankConnection={true} requiresSubscription={true}>
+              <AppLayout>
+                <Investments />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
           <Route path="/assistant" element={
-            <ProtectedRoute requiresBankConnection={true}>
+            <ProtectedRoute requiresBankConnection={true} requiresSubscription={true}>
               <AppLayout>
                 <AIAssistant />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/upgrade" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Upgrade />
               </AppLayout>
             </ProtectedRoute>
           } />

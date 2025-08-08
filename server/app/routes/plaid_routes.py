@@ -1,232 +1,219 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from plaid.api import plaid_api
-from plaid.model.transactions_get_request import TransactionsGetRequest
-from plaid.model.accounts_get_request import AccountsGetRequest
-from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
-from plaid.model.link_token_create_request import LinkTokenCreateRequest
-from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
-from plaid.model.country_code import CountryCode
-from plaid.model.products import Products
-from plaid.configuration import Configuration
-from plaid.api_client import ApiClient
-import os
-from datetime import datetime, timedelta
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
 import logging
-from dotenv import load_dotenv
+from typing import Dict, Any
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+from plaid.model.investments_holdings_get_request import InvestmentsHoldingsGetRequest
+from plaid.model.investments_transactions_get_request import InvestmentsTransactionsGetRequest
+from ..services.plaid_service import PlaidService
+from ..core.auth import get_current_user, verify_user_access
+from ..models.plaid_models import LinkTokenRequest, PublicTokenExchangeRequest
+
 logger = logging.getLogger(__name__)
-
-load_dotenv()
-
 router = APIRouter()
 
-# Plaid configuration
-PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
-PLAID_SECRET = os.getenv('PLAID_SECRET')
-PLAID_ENV = os.getenv('PLAID_ENV', 'production')
+# Initialize service
+plaid_service = PlaidService()
 
-# Debug: Print environment variables (remove in production)
-print(f"PLAID_CLIENT_ID: {PLAID_CLIENT_ID}")
-print(f"PLAID_SECRET: {'*' * len(PLAID_SECRET) if PLAID_SECRET else None}")
-print(f"PLAID_ENV: {PLAID_ENV}")
-
-if not PLAID_CLIENT_ID or not PLAID_SECRET:
-    raise ValueError("PLAID_CLIENT_ID and PLAID_SECRET environment variables are required")
-
-# Map environment names to Plaid host URLs
-PLAID_ENVIRONMENTS = {
-    'sandbox': 'https://sandbox.plaid.com',
-    'development': 'https://development.plaid.com',
-    'production': 'https://production.plaid.com'
-}
-
-# Get the host URL for the environment
-if PLAID_ENV not in PLAID_ENVIRONMENTS:
-    raise ValueError(f"Invalid PLAID_ENV: {PLAID_ENV}. Must be one of: {list(PLAID_ENVIRONMENTS.keys())}")
-
-host_url = PLAID_ENVIRONMENTS[PLAID_ENV]
-
-# Configure Plaid client
-configuration = Configuration(
-    host=host_url,
-    api_key={
-        'clientId': PLAID_CLIENT_ID,
-        'secret': PLAID_SECRET
-    }
-)
-
-api_client = ApiClient(configuration)
-client = plaid_api.PlaidApi(api_client)
-
-# Pydantic models
-class LinkTokenRequest(BaseModel):
-    user_id: str
-    client_name: str = "Plaid Integration App"
-
-class PublicTokenExchangeRequest(BaseModel):
-    public_token: str
-
-class ItemInfo(BaseModel):
-    access_token: str
-    item_id: str
-
-class AccountInfo(BaseModel):
-    account_id: str
-    name: str
-    type: str
-    subtype: Optional[str]
-    balance: float
-
-class TransactionInfo(BaseModel):
-    transaction_id: str
-    account_id: str
-    amount: float
-    date: str
-    name: str
-    category: List[str]
-
-# In-memory storage (replace with database in production)
-user_items = {}
 
 @router.post("/create_link_token")
-async def create_link_token(request: LinkTokenRequest):
-    """Create a link token for Plaid Link initialization"""
+async def create_link_token(
+    request: LinkTokenRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Create a link token for Plaid Link initialization."""
     try:
-        link_request = LinkTokenCreateRequest(
-            products=[Products('transactions'), Products('auth')],
-            client_name=request.client_name,
-            country_codes=[CountryCode('US')],
-            language='en',
-            user=LinkTokenCreateRequestUser(client_user_id=request.user_id)
-        )
-        
-        response = client.link_token_create(link_request)
-        
-        return {
-            "link_token": response.link_token,
-            "expiration": response.expiration.isoformat()
-        }
-    
+        user_id = current_user["user_id"]
+        result = await plaid_service.create_link_token(user_id, request.client_name)
+        return result
     except Exception as e:
         logger.error(f"Error creating link token: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create link token: {str(e)}")
 
+
 @router.post("/exchange_public_token")
-async def exchange_public_token(request: PublicTokenExchangeRequest):
-    """Exchange public token for access token"""
+async def exchange_public_token(
+    payload: PublicTokenExchangeRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Exchange public token for access token and store bank item."""
     try:
-        exchange_request = ItemPublicTokenExchangeRequest(
-            public_token=request.public_token
+        user_id = current_user["user_id"]
+        result = await plaid_service.exchange_public_token(
+            payload.public_token, 
+            user_id, 
+            payload.metadata
         )
-        
-        response = client.item_public_token_exchange(exchange_request)
-        
-        # Store the access token and item ID (in production, store in database)
-        item_info = {
-            "access_token": response.access_token,
-            "item_id": response.item_id
-        }
-        
-        # For demo purposes, we'll use item_id as key
-        user_items[response.item_id] = item_info
-        
-        return {
-            "access_token": response.access_token,
-            "item_id": response.item_id,
-            "message": "Successfully exchanged public token"
-        }
-    
+        return result
     except Exception as e:
         logger.error(f"Error exchanging public token: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to exchange public token: {str(e)}")
 
-@router.get("/accounts/{item_id}")
-async def get_accounts(item_id: str):
-    """Get accounts for a specific item"""
+
+@router.get("/accounts/user/{user_id}")
+async def get_accounts_by_user(
+    user_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get all accounts for a user."""
     try:
-        if item_id not in user_items:
-            raise HTTPException(status_code=404, detail="Item not found")
-        
-        access_token = user_items[item_id]["access_token"]
-        
-        accounts_request = AccountsGetRequest(access_token=access_token)
-        response = client.accounts_get(accounts_request)
-        
-        accounts = []
-        for account in response.accounts:
-            accounts.append(AccountInfo(
-                account_id=account.account_id,
-                name=account.name,
-                type=account.type,
-                subtype=account.subtype,
-                balance=float(account.balances.current or 0)
-            ))
-        
+        verify_user_access(current_user["user_id"], user_id)
+        accounts = await plaid_service.get_user_bank_accounts(user_id)
         return {"accounts": accounts}
-    
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching accounts: {str(e)}")
+        logger.error(f"Error fetching user accounts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch accounts: {str(e)}")
 
-@router.get("/transactions/{item_id}")
-async def get_transactions(item_id: str, days: int = 30):
-    """Get transactions for a specific item"""
+
+@router.get("/user_transactions/{user_id}")
+async def get_user_transactions(
+    user_id: str,
+    days: int = 30,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Get all transactions for a user."""
     try:
-        if item_id not in user_items:
-            raise HTTPException(status_code=404, detail="Item not found")
-        
-        access_token = user_items[item_id]["access_token"]
-        
-        # Get transactions for the last 30 days
-        start_date = (datetime.now() - timedelta(days=days)).date()
-        end_date = datetime.now().date()
-        
-        transactions_request = TransactionsGetRequest(
-            access_token=access_token,
-            start_date=start_date,
-            end_date=end_date
-        )
-        
-        response = client.transactions_get(transactions_request)
-        
-        transactions = []
-        for transaction in response.transactions:
-            transactions.append(TransactionInfo(
-                transaction_id=transaction.transaction_id,
-                account_id=transaction.account_id,
-                amount=float(transaction.amount),
-                date=transaction.date.isoformat(),
-                name=transaction.name,
-                category=transaction.category or []
-            ))
-        
-        return {
-            "transactions": transactions,
-            "total_transactions": response.total_transactions
-        }
-    
+        verify_user_access(current_user["user_id"], user_id)
+        result = await plaid_service.get_user_transactions(user_id, days)
+        return result
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching transactions: {str(e)}")
+        logger.error(f"Error fetching user transactions: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch transactions: {str(e)}")
 
-@router.get("/items")
-async def get_all_items():
-    """Get all stored items (for demo purposes)"""
-    return {"items": list(user_items.keys())}
 
-@router.delete("/items/{item_id}")
-async def delete_item(item_id: str):
-    """Delete an item from storage"""
-    if item_id in user_items:
-        del user_items[item_id]
-        return {"message": f"Item {item_id} deleted successfully"}
-    else:
-        raise HTTPException(status_code=404, detail="Item not found")
+@router.post("/sync/{item_id}")
+async def sync_item_transactions(
+    item_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Manually sync transactions for a specific item."""
+    try:
+        user_id = current_user["user_id"]
+        result = await plaid_service.sync_item_transactions(user_id, item_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error syncing item {item_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to sync transactions: {str(e)}")
+
+
+@router.delete("/remove/{item_id}")
+async def remove_bank_item(
+    item_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Remove a bank item and all associated data."""
+    try:
+        user_id = current_user["user_id"]
+        result = await plaid_service.remove_bank_item(user_id, item_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error removing item {item_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to remove bank item: {str(e)}")
+
+
+@router.get("/debug/auth")
+async def debug_auth(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Debug endpoint to check authentication."""
+    from datetime import datetime
+    return {
+        "user_id": current_user["user_id"],
+        "email": current_user.get("email"),
+        "role": current_user.get("role"),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@router.get("/investments/{item_id}/holdings")
+async def get_investment_holdings(item_id: str):
+    """Get investment holdings for a specific item"""
+    try:
+        if item_id not in user_items:
+            raise HTTPException(status_code=404, detail="Item not found")
+
+        access_token = user_items[item_id]["access_token"]
+
+        holdings_request = InvestmentsHoldingsGetRequest(access_token=access_token)
+        response = client.investments_holdings_get(holdings_request)
+
+        securities = {s.security_id: s for s in response.securities}
+
+        holdings = []
+        total_value = 0.0
+        for h in response.holdings:
+            security = securities.get(h.security_id)
+            price = float(h.institution_price) if h.institution_price else None
+            value = float(h.institution_value) if h.institution_value else (
+                (price or 0) * float(h.quantity)
+            )
+            holdings.append(
+                HoldingInfo(
+                    security_id=h.security_id,
+                    account_id=h.account_id,
+                    ticker=getattr(security, "ticker", None),
+                    name=getattr(security, "name", None),
+                    quantity=float(h.quantity),
+                    price=price,
+                    value=value,
+                )
+            )
+            total_value += value or 0.0
+
+        return {"holdings": holdings, "total_value": total_value}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching investment holdings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch holdings: {str(e)}")
+
+
+@router.get("/investments/{item_id}/transactions")
+async def get_investment_transactions(item_id: str, days: int = 30):
+    """Get investment transactions for a specific item"""
+    try:
+        if item_id not in user_items:
+            raise HTTPException(status_code=404, detail="Item not found")
+
+        access_token = user_items[item_id]["access_token"]
+
+        start_date = (datetime.now() - timedelta(days=days)).date()
+        end_date = datetime.now().date()
+
+        transactions_request = InvestmentsTransactionsGetRequest(
+            access_token=access_token,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        response = client.investments_transactions_get(transactions_request)
+
+        securities = {s.security_id: s for s in response.securities}
+
+        transactions = []
+        for t in response.investment_transactions:
+            security = securities.get(t.security_id) if t.security_id else None
+            transactions.append(
+                InvestmentTransactionInfo(
+                    investment_transaction_id=t.investment_transaction_id,
+                    account_id=t.account_id,
+                    security_id=t.security_id,
+                    ticker=getattr(security, "ticker", None),
+                    name=getattr(security, "name", None),
+                    type=t.type,
+                    date=t.date.isoformat(),
+                    quantity=float(t.quantity) if t.quantity else None,
+                    price=float(t.price) if t.price else None,
+                    amount=float(t.amount),
+                    fees=float(t.fees) if t.fees else None,
+                )
+            )
+
+        return {"transactions": transactions}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching investment transactions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch investment transactions: {str(e)}")
