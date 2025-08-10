@@ -18,6 +18,8 @@ class CheckoutSessionRequest(BaseModel):
 
 class SubscriptionStatus(BaseModel):
     is_pro: bool
+    subscription_status: Optional[str] = None
+    current_period_end: Optional[str] = None
 
 
 class WebhookEvent(BaseModel):
