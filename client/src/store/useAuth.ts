@@ -1,195 +1,98 @@
-import { create } from 'zustand';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { Profile } from '@/types';
+import { useState, useEffect } from 'react'
+import { User, Session, AuthError } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
 
 interface AuthState {
-  user: User | null;
-  session: Session | null;
-  profile: Profile | null;
-  isLoading: boolean;
-  isInitialized: boolean;
-
-  // Actions
-  initialize: () => Promise<void>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
-  fetchProfile: () => Promise<void>;
-  updateBankConnection: (hasConnected: boolean) => Promise<void>;
-  signInWithOAuth: (provider: 'google' | 'github') => Promise<{ error: string | null }>;
+  user: User | null
+  session: Session | null
+  loading: boolean
 }
 
-export const useAuth = create<AuthState>((set, get) => ({
-  user: null,
-  session: null,
-  profile: null,
-  isLoading: true,
-  isInitialized: false,
+export function useAuth() {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    session: null,
+    loading: true
+  })
 
-  initialize: async () => {
-    try {
-      // Set up auth state listener FIRST
-      supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          set({ session, user: session?.user ?? null });
-          
-          if (session?.user) {
-            // Defer profile fetch to avoid potential deadlock
-            setTimeout(() => {
-              get().fetchProfile();
-            }, 0);
-          } else {
-            set({ profile: null });
-          }
-        }
-      );
-
-      // THEN check for existing session
-      const { data: { session } } = await supabase.auth.getSession();
-      set({ 
-        session, 
+  useEffect(() => {
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      setAuthState({
         user: session?.user ?? null,
-        isLoading: false,
-        isInitialized: true 
-      });
-
-      if (session?.user) {
-        await get().fetchProfile();
-      }
-    } catch (error) {
-      console.error('Error initializing auth:', error);
-      set({ isLoading: false, isInitialized: true });
+        session: session,
+        loading: false
+      })
     }
-  },
 
-  signUp: async (email: string, password: string, fullName?: string) => {
-    try {
-      set({ isLoading: true });
-      
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: fullName ? { full_name: fullName } : undefined
+    getInitialSession()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id)
+        
+        setAuthState({
+          user: session?.user ?? null,
+          session: session,
+          loading: false
+        })
+
+        // Store access token for API calls
+        if (session?.access_token) {
+          localStorage.setItem('auth_token', session.access_token)
+        } else {
+          localStorage.removeItem('auth_token')
         }
-      });
-
-      set({ isLoading: false });
-      
-      if (error) {
-        return { error: error.message };
       }
-      
-      return { error: null };
-    } catch (error) {
-      set({ isLoading: false });
-      return { error: 'An unexpected error occurred' };
-    }
-  },
+    )
 
-  signIn: async (email: string, password: string) => {
-    try {
-      set({ isLoading: true });
-      
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+    return () => subscription.unsubscribe()
+  }, [])
 
-      set({ isLoading: false });
-      
-      if (error) {
-        return { error: error.message };
+  const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    return { data, error }
+  }
+
+  const signUp = async (email: string, password: string, userData?: any) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: userData
       }
-      
-      return { error: null };
-    } catch (error) {
-      set({ isLoading: false });
-      return { error: 'An unexpected error occurred' };
-    }
-  },
+    })
+    return { data, error }
+  }
 
-  signInWithOAuth: async (provider) => {
-  try {
-    const { error } = await supabase.auth.signInWithOAuth({
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut()
+    localStorage.removeItem('auth_token')
+    return { error }
+  }
+
+  const signInWithOAuth = async (provider: 'google' | 'apple') => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-
-    if (error) {
-      console.error("OAuth login failed:", error);
-      return { error: error.message };
-    }
-
-    return { error: null };
-  } catch (error) {
-    console.error("Unexpected OAuth error:", error);
-    return { error: 'An unexpected error occurred' };
-  }
-},
-
-
-  signOut: async () => {
-    try {
-      await supabase.auth.signOut();
-      set({ user: null, session: null, profile: null });
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  },
-
-  fetchProfile: async () => {
-    try {
-      const { user } = get();
-      if (!user) return;
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
+        redirectTo: `${window.location.origin}/dashboard`
       }
-
-      set({ profile });
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    }
-  },
-
-  updateBankConnection: async (hasConnected: boolean) => {
-    try {
-      const { user, profile } = get();
-      if (!user || !profile) return;
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ has_connected_bank: hasConnected })
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error updating bank connection:', error);
-        return;
-      }
-
-      // Update local profile state
-      set({ 
-        profile: { 
-          ...profile, 
-          has_connected_bank: hasConnected 
-        } 
-      });
-    } catch (error) {
-      console.error('Error updating bank connection:', error);
-    }
+    })
+    return { data, error }
   }
-}));
+
+  return {
+    ...authState,
+    signIn,
+    signUp,
+    signOut,
+    signInWithOAuth,
+    profile: authState.user?.user_metadata
+  }
+}

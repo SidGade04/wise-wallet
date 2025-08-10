@@ -1,8 +1,3 @@
-// Debug why your Dashboard is empty
-
-// 1. Add debugging to your Dashboard component
-// Update your Dashboard.tsx with this debug version:
-
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlaidLink } from "@/components/PlaidLink";
 import { BankConnectionStatus } from "@/components/BankConnectionStatus";
+// import { DebugPanel } from "@/components/debug/DebugPanel"; // Import the debug component
 import { useAuth } from "@/store/useAuth";
 import { useBankAccounts, useTransformedTransactions } from "@/hooks/usePlaid";
 import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
@@ -58,6 +54,9 @@ export default function Dashboard() {
   const currentMonth = new Date();
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
+
+  // Control debug panel visibility
+  // const showDebugPanel = import.meta.env.DEV || localStorage.getItem('show_debug') === 'true';
 
   // Calculate spending metrics with debugging
   const { 
@@ -112,7 +111,6 @@ export default function Dashboard() {
     console.log('This month (pre outflow):', thisMonth.length);
     console.log('Outflows this month:', thisMonth.filter(isOutflow).length);
 
-
     // Get recent transactions
     const recent = [...transactions]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -159,6 +157,9 @@ export default function Dashboard() {
   if (transactionsError || accountsError) {
     return (
       <div className="space-y-6">
+        {/* Show debug panel even in error state if enabled */}
+        {/* <DebugPanel show={showDebugPanel} /> */}
+
         <div>
           <h1 className="text-3xl font-bold">Welcome back, {profile?.full_name || 'User'}!</h1>
           <p className="text-muted-foreground">
@@ -183,7 +184,7 @@ export default function Dashboard() {
       </div>
     );
   }
-
+  
   // Debug the bank accounts structure
   console.log('🏦 Bank accounts structure:', {
     bankAccounts,
@@ -195,6 +196,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Debug Panel - Only shows in dev mode or when explicitly enabled */}
+      {/* <DebugPanel show={showDebugPanel} /> */}
+
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>

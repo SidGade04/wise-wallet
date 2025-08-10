@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/store/useAuth";
+import { usePrefs } from "@/store/usePrefs";
 
 const navigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -38,6 +39,7 @@ export function AppSidebar() {
   const { open } = useSidebar();
   const location = useLocation();
   const { profile, signOut } = useAuth();
+  const { theme } = usePrefs();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -45,10 +47,8 @@ export function AppSidebar() {
     isActive ? "bg-primary font-medium" : "hover:bg-accent/50";
 
   return (
-    <Sidebar
-      collapsible="icon"
-    >
-      <SidebarContent className="bg-gradient-subtle">
+    <Sidebar collapsible="icon">
+      <SidebarContent>
         {/* Logo/Brand */}
         <div className="p-4 border-b border-border/50">
           <div className="flex items-center gap-3">
@@ -60,6 +60,9 @@ export function AppSidebar() {
                 <h1 className="font-bold text-lg bg-gradient-financial bg-clip-text text-transparent">
                   Wise Wallet
                 </h1>
+                {/* <p className="text-xs text-muted-foreground">
+                  {theme === "dark" ? "🌙" : theme === "light" ? "☀️" : "🖥️"} {theme}
+                </p> */}
               </div>
             )}
           </div>
@@ -70,7 +73,9 @@ export function AppSidebar() {
           <div className="p-4 border-b border-border/50">
             <div className="flex items-center gap-3">
               <Avatar className="w-8 h-8">
-                <AvatarFallback>{(profile.full_name || profile.email).charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarFallback>
+                  {(profile.full_name || profile.email).charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               {open && (
                 <div className="flex-1 min-w-0">
@@ -105,10 +110,10 @@ export function AppSidebar() {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <button className="w-full hover:bg-accent/50">
+                <NavLink to="/settings" end className={getNavCls}>
                   <Settings className="w-4 h-4" />
                   {open && <span>Settings</span>}
-                </button>
+                </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
