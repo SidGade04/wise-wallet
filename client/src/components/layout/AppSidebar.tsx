@@ -60,9 +60,6 @@ export function AppSidebar() {
                 <h1 className="font-bold text-lg bg-gradient-financial bg-clip-text text-transparent">
                   Wise Wallet
                 </h1>
-                {/* <p className="text-xs text-muted-foreground">
-                  {theme === "dark" ? "🌙" : theme === "light" ? "☀️" : "🖥️"} {theme}
-                </p> */}
               </div>
             )}
           </div>
