@@ -248,8 +248,16 @@ class StripeService:
         try:
             logger.info(f"🔍 Checking subscription status for user: {user_id}")
             
-            result = self.supabase.table('profiles').select('is_pro, subscription_status, stripe_customer_id, stripe_subscription_id').eq('user_id', user_id).single().execute()
-            
+            result = (
+                self.supabase.table('profiles')
+                .select(
+                    'is_pro, subscription_status, subscription_current_period_end'
+                )
+                .eq('user_id', user_id)
+                .single()
+                .execute()
+            )
+
             if not result.data:
                 logger.error(f"❌ Profile not found for user: {user_id}")
                 raise Exception("Profile not found")
@@ -259,11 +267,11 @@ class StripeService:
             logger.info(f"Full profile data: {result.data}")
             
             return {
-                "is_pro": True,  # or False
-                "status": "active",  # active, canceled, past_due, etc.
-                "current_period_end": "2024-12-15T00:00:00Z",  # ISO date string
-                "plan_name": "Pro Plan",
-                "cancel_at_period_end": False
+                "is_pro": is_pro,
+                "subscription_status": result.data.get("subscription_status"),
+                "current_period_end": result.data.get(
+                    "subscription_current_period_end"
+                ),
             }
             
         except Exception as e:

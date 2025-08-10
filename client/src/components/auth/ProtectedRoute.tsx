@@ -308,7 +308,7 @@ export function ProtectedRoute({
             </Button>
 
             {/* Debug info - remove in production */}
-            <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
+            {/* <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
               <div>isPro: {isPro ? 'TRUE' : 'FALSE'}</div>
               <div>User ID: {user?.id}</div>
               <div>Error: {subError?.message || 'None'}</div>
@@ -324,7 +324,7 @@ export function ProtectedRoute({
                 <RefreshCw className="w-3 h-3 mr-1" />
                 Force Refresh
               </Button>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       </div>
