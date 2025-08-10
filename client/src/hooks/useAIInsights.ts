@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/store/useAuth';
 import { AIInsight } from '@/types';
 
-const API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_AI_API_URL || 'http://localhost:8080';
 
 export const useAIInsights = () => {
   const { user } = useAuth();
